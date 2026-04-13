@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+venv/
+*.xlsx
+!templates/*.xlsx
+uploads/
+output/
+.mypy_cache/
+.pytest_cache/
+*.log
+*.bak

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: hotel-ocr
+    runtime: docker
+    plan: starter  # $7/月, 512MB RAM, 足够OCR处理
+    healthCheckPath: /health
+    envVars:
+      - key: OCR_PROVIDER
+        value: glm
+      - key: GLM_API_KEY
+        sync: false  # 在 Render Dashboard 手动设置
+      - key: APP_ENV
+        value: production
+      - key: DATA_DIR
+        value: /app/data
+    disk:
+      name: ocr-data
+      mountPath: /app/data
+      sizeGB: 1
