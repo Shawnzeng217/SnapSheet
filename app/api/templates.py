@@ -7,6 +7,8 @@ import os
 import shutil
 import json
 
+import openpyxl
+
 from app.models import APIResponse, TemplateInfo
 from app.services.excel_service import ExcelService
 from app.config import settings
@@ -104,3 +106,68 @@ async def delete_template(template_id: str):
         json.dump(templates, f, ensure_ascii=False, indent=2)
 
     return APIResponse(message=f"Template {template_id} deleted")
+
+
+@router.get("/{template_id}/preview", response_model=APIResponse)
+async def preview_template(template_id: str, max_rows: int = 50):
+    """预览模板内容 / Preview template as HTML table"""
+    meta_path = os.path.join(TEMPLATE_DIR, "meta.json")
+    if not os.path.exists(meta_path):
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        templates = json.load(f)
+
+    target = None
+    for t in templates:
+        if t["template_id"] == template_id:
+            target = t
+            break
+
+    if not target or not os.path.exists(target.get("file", "")):
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    wb = openpyxl.load_workbook(target["file"], data_only=True)
+    ws = wb.active
+
+    # 收集合并单元格信息 / Collect merged cell ranges
+    merges: dict[tuple[int, int], tuple[int, int]] = {}
+    skip: set[tuple[int, int]] = set()
+    for mg in ws.merged_cells.ranges:
+        r1, c1, r2, c2 = mg.min_row, mg.min_col, mg.max_row, mg.max_col
+        merges[(r1, c1)] = (r2 - r1 + 1, c2 - c1 + 1)
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                if (r, c) != (r1, c1):
+                    skip.add((r, c))
+
+    html = '<table class="ocr-table-preview">'
+    row_count = 0
+    for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row or 1, max_rows)):
+        html += "<tr>"
+        for cell in row:
+            r, c = cell.row, cell.column
+            if (r, c) in skip:
+                continue
+            val = str(cell.value) if cell.value is not None else ""
+            attrs = ""
+            if (r, c) in merges:
+                rs, cs = merges[(r, c)]
+                if rs > 1:
+                    attrs += f' rowspan="{rs}"'
+                if cs > 1:
+                    attrs += f' colspan="{cs}"'
+            html += f"<td{attrs}>{val}</td>"
+        html += "</tr>"
+        row_count += 1
+    html += "</table>"
+
+    wb.close()
+
+    return APIResponse(data={
+        "template_id": template_id,
+        "name": target["name"],
+        "html": html,
+        "row_count": row_count,
+        "truncated": (ws.max_row or 0) > max_rows,
+    })

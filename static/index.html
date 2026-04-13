@@ -172,12 +172,26 @@
             </div>
         </div>
 
+        <!-- Template Preview Modal -->
+        <div class="modal-overlay" id="templatePreviewModal" style="display:none;">
+            <div class="modal-card modal-card-wide">
+                <div class="modal-card-header">
+                    <h3 id="templatePreviewTitle">模板预览 / Template Preview</h3>
+                    <button class="btn-close" id="btnClosePreview">&times;</button>
+                </div>
+                <div class="template-preview-scroll" id="templatePreviewContent">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Template Management -->
-        <section class="glass-card" id="step-templates">
-            <div class="card-header">
+        <details class="glass-card" id="step-templates">
+            <summary class="card-header card-toggle">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 <h2>模板管理 / Templates</h2>
-            </div>
+                <svg class="toggle-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
             <div id="templateList" class="template-list"></div>
             <details>
                 <summary>上传Excel模板 / Upload Template</summary>
@@ -203,7 +217,7 @@
                     上传模板 / Upload Template
                 </button>
             </details>
-        </section>
+        </details>
 
         <footer class="footer">
             <p>SnapSheet &mdash; 拍一拍，表格来</p>

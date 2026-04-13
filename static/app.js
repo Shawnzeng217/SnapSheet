@@ -174,6 +174,11 @@
           var info = document.createElement("span");
           info.className = "template-info";
           info.textContent = label;
+          info.style.cursor = "pointer";
+          info.title = "点击预览 / Click to preview";
+          info.addEventListener("click", function () {
+            previewTemplate(t.template_id, t.name);
+          });
 
           var btnDel = document.createElement("button");
           btnDel.className = "btn-delete";
@@ -215,6 +220,43 @@
       showToast("删除失败: " + e.message);
     }
   }
+
+  // ===== Template Preview =====
+  var templatePreviewModal = document.getElementById("templatePreviewModal");
+  var templatePreviewTitle = document.getElementById("templatePreviewTitle");
+  var templatePreviewContent = document.getElementById("templatePreviewContent");
+  var btnClosePreview = document.getElementById("btnClosePreview");
+
+  async function previewTemplate(templateId, name) {
+    templatePreviewTitle.textContent = name;
+    templatePreviewContent.innerHTML = '<div class="spinner"></div>';
+    templatePreviewModal.style.display = "flex";
+
+    try {
+      var resp = await fetch(API_BASE + "/templates/" + templateId + "/preview");
+      var data = await resp.json();
+      if (data.code === 0 && data.data && data.data.html) {
+        var html = data.data.html;
+        if (data.data.truncated) {
+          html += '<p class="preview-hint" style="margin-top:8px;">仅显示前 ' + data.data.row_count + ' 行 / First ' + data.data.row_count + ' rows shown</p>';
+        }
+        templatePreviewContent.innerHTML = html;
+      } else {
+        templatePreviewContent.innerHTML = '<p class="preview-hint">无法加载预览 / Preview unavailable</p>';
+      }
+    } catch (e) {
+      templatePreviewContent.innerHTML = '<p class="preview-hint">加载失败 / Load failed</p>';
+    }
+  }
+
+  btnClosePreview.addEventListener("click", function () {
+    templatePreviewModal.style.display = "none";
+  });
+  templatePreviewModal.addEventListener("click", function (e) {
+    if (e.target === templatePreviewModal) {
+      templatePreviewModal.style.display = "none";
+    }
+  });
 
   // ===== OCR Recognition =====
   btnRecognize.addEventListener("click", async function () {
