@@ -7,12 +7,15 @@ Excel Service / Excel生成服务
 import os
 import re
 import json
+import logging
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 
 from app.models import OCRResult
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelService:
@@ -52,8 +55,10 @@ class ExcelService:
         3. 无模板 + 无表格 → 字段列表
         """
         if template_id:
+            logger.info(f"generate: template_id={template_id!r} -> template_restore")
             return await self._generate_template_restore(ocr_result, template_id)
         elif ocr_result.table_html:
+            logger.info(f"generate: no template, has table_html -> table_structure")
             return await self._generate_table_structure(ocr_result)
         else:
             return await self._generate_data_only(ocr_result)
@@ -380,9 +385,22 @@ class ExcelService:
         max_tpl_col = ws.max_column or 1
 
         # ── 2. 构建文本 → 位置索引 ──
+        # 对于合并单元格，只用左上角位置，避免同一文本产生多个位置导致唯一性判断失败
+        merged_topleft: set[tuple[int, int]] = set()
+        merged_slaves_set: set[tuple[int, int]] = set()
+        for mr in ws.merged_cells.ranges:
+            merged_topleft.add((mr.min_row, mr.min_col))
+            for r in range(mr.min_row, mr.max_row + 1):
+                for c in range(mr.min_col, mr.max_col + 1):
+                    if not (r == mr.min_row and c == mr.min_col):
+                        merged_slaves_set.add((r, c))
+
         tpl_text_positions: dict[str, list[tuple[int, int]]] = {}
         for r in range(1, max_tpl_row + 1):
             for c in range(1, max_tpl_col + 1):
+                # 跳过合并单元格的从属位置，只保留左上角
+                if (r, c) in merged_slaves_set:
+                    continue
                 text = get_cell_text(r, c)
                 if text:
                     norm = self._normalize(text)
@@ -402,7 +420,7 @@ class ExcelService:
         anchor_pairs: list[tuple[int, int, int, int]] = []  # (tpl_r, tpl_c, ocr_r, ocr_c)
         anchor_texts: set[str] = set()
 
-        # 优先用两侧都唯一出现的文本（最可靠）
+        # 第1层：两侧都唯一出现的文本（最可靠）
         for norm_text, tpl_pos in tpl_text_positions.items():
             ocr_pos = ocr_text_positions.get(norm_text)
             if not ocr_pos:
@@ -411,19 +429,24 @@ class ExcelService:
                 anchor_pairs.append((tpl_pos[0][0], tpl_pos[0][1], ocr_pos[0][0], ocr_pos[0][1]))
                 anchor_texts.add(norm_text)
 
-        if not anchor_pairs:
-            # 放宽：非唯一文本，按最近距离配对
-            for norm_text, tpl_pos in tpl_text_positions.items():
-                ocr_pos = ocr_text_positions.get(norm_text)
-                if not ocr_pos:
-                    continue
-                for tr, tc in tpl_pos:
-                    best = min(ocr_pos, key=lambda o: abs(tr - o[0]) + abs(tc - o[1]))
-                    anchor_pairs.append((tr, tc, best[0], best[1]))
-                    anchor_texts.add(norm_text)
+        # 第2层：非唯一文本，按顺序配对补充（始终执行，而非仅作为后备）
+        # 对称出现的重复标签（如两段表头中的 "STARTING NUMBER"）用序数配对
+        for norm_text, tpl_pos in tpl_text_positions.items():
+            if norm_text in anchor_texts:
+                continue  # 已作为唯一锚点
+            ocr_pos = ocr_text_positions.get(norm_text)
+            if not ocr_pos:
+                continue
+            sorted_tpl = sorted(tpl_pos)
+            sorted_ocr = sorted(ocr_pos)
+            # 仅配对数量相等的情况以保证可靠性
+            if len(sorted_tpl) == len(sorted_ocr):
+                for (tr, tc), (or_, oc) in zip(sorted_tpl, sorted_ocr):
+                    anchor_pairs.append((tr, tc, or_, oc))
+                anchor_texts.add(norm_text)
 
         if not anchor_pairs:
-            # 再放宽：子串匹配 - OCR常将多行标签合并为一个单元格
+            # 第3层：子串匹配 - OCR常将多行标签合并为一个单元格
             for tpl_norm, tpl_pos in tpl_text_positions.items():
                 if len(tpl_norm) < 2:
                     continue
@@ -499,9 +522,10 @@ class ExcelService:
         valid_tpl_col_min = global_col_off
         valid_tpl_col_max = ocr_max_col + global_col_off
 
-        # ── 5b. 识别模板中的"锚点区段"，防止数据溢出到区段间的空白行 ──
-        # 将连续的锚点行(间距≤3)归为同一区段
-        anchor_sections: list[tuple[int, int]] = []  # (start_row, end_row)
+        # ── 5b. 识别模板中的"锚点区段"，防止数据溢出到不相关区域 ──
+        # 将连续的锚点行(间距≤3)归为同一区段，然后向下扩展到下一区段前
+        # 这样数据行（位于标签行之间）也被纳入区段范围
+        raw_sections: list[tuple[int, int]] = []  # (start_row, end_row)
         if mapped_rows:
             sec_start = mapped_rows[0]
             sec_end = mapped_rows[0]
@@ -509,10 +533,22 @@ class ExcelService:
                 if mr - sec_end <= 3:
                     sec_end = mr
                 else:
-                    anchor_sections.append((sec_start, sec_end))
+                    raw_sections.append((sec_start, sec_end))
                     sec_start = mr
                     sec_end = mr
-            anchor_sections.append((sec_start, sec_end))
+            raw_sections.append((sec_start, sec_end))
+
+        # 扩展每个区段：向下延伸到下一个区段起始行前一行（覆盖数据行）
+        # 最后一个区段延伸到OCR有效行范围对应的模板行
+        anchor_sections: list[tuple[int, int]] = []
+        ocr_max_tpl_row = ocr_max_row + global_row_off  # OCR最大行对应的模板行
+        for i, (s, e) in enumerate(raw_sections):
+            if i + 1 < len(raw_sections):
+                next_start = raw_sections[i + 1][0]
+                expanded_end = next_start - 1
+            else:
+                expanded_end = max(e, ocr_max_tpl_row)
+            anchor_sections.append((s, expanded_end))
 
         def row_in_section(tpl_r: int) -> bool:
             """检查模板行是否在某个锚点区段内"""

@@ -46,6 +46,7 @@ async def recognize(
         shutil.copyfileobj(image.file, f)
 
     # OCR识别 / Run OCR
+    logger.info(f"Recognize request: task_id={task_id}, template_id={template_id!r}, language={language}")
     ocr_result = await ocr_service.recognize(
         image_path=image_path,
         template_id=template_id,
