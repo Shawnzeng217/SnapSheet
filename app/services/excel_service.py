@@ -757,13 +757,15 @@ class ExcelService:
 
         for t in templates:
             if t.get("template_id") == template_id:
-                path = t.get("file", "")
+                filename = t.get("file", "")
+                # 兼容旧格式：若存的是带目录的路径，取文件名部分
+                filename = os.path.basename(filename.replace("\\", "/"))
+                path = os.path.join(self.TEMPLATE_DIR, filename)
                 if os.path.exists(path):
                     # 兜底：如果文件是.xls，运行时自动转换
                     if path.lower().endswith(".xls"):
                         xlsx_path = self.convert_xls_to_xlsx(path)
-                        # 更新meta中的路径
-                        t["file"] = xlsx_path
+                        t["file"] = os.path.basename(xlsx_path)
                         with open(meta_path, "w", encoding="utf-8") as fw:
                             json.dump(templates, fw, ensure_ascii=False, indent=2)
                         return xlsx_path

@@ -3,36 +3,36 @@
     "template_id": "product_checking_list",
     "name": "Product Checking List",
     "description": "Product Checking List",
-    "file": "templates\\product_checking_list.xlsx"
+    "file": "product_checking_list.xlsx"
   },
   {
     "template_id": "发票盘点表",
     "name": "发票盘点表",
     "description": "1",
-    "file": "templates\\发票盘点表.xlsx"
+    "file": "发票盘点表.xlsx"
   },
   {
     "template_id": "2",
     "name": "2",
     "description": "",
-    "file": "templates\\2.xlsx"
+    "file": "2.xlsx"
   },
   {
     "template_id": "流转备用金交接记录表",
     "name": "流转备用金交接记录表",
     "description": "Revolving Funds Handover Log",
-    "file": "templates\\\\流转备用金交接记录表.xlsx"
+    "file": "流转备用金交接记录表.xlsx"
   },
   {
     "template_id": "油条质检表",
     "name": "油条质检表",
     "description": "",
-    "file": "templates\\油条质检表.xlsx"
+    "file": "油条质检表.xlsx"
   },
   {
     "template_id": "假房申请表",
     "name": "假房申请表",
     "description": "",
-    "file": "templates\\假房申请表.xlsx"
+    "file": "假房申请表.xlsx"
   }
 ]

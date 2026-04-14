@@ -11,6 +11,12 @@ if [ -n "$DATA_DIR" ]; then
         echo "Copying default templates..."
         cp -r /app/_templates_default/* "$DATA_DIR/templates/" 2>/dev/null || true
     fi
+
+    # Always sync meta.json from default (picks up new templates on redeploy)
+    if [ -f /app/_templates_default/meta.json ]; then
+        cp /app/_templates_default/meta.json "$DATA_DIR/templates/meta.json"
+        echo "Synced meta.json"
+    fi
 fi
 
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

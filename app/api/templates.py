@@ -57,6 +57,7 @@ async def upload_template(
         save_path = raw_path
 
     # 更新元数据 / Update metadata
+    # 只存文件名，运行时用 TEMPLATE_DIR 拼接完整路径（跨平台兼容）
     meta_path = os.path.join(TEMPLATE_DIR, "meta.json")
     templates = []
     if os.path.exists(meta_path):
@@ -69,7 +70,7 @@ async def upload_template(
         "template_id": template_id,
         "name": name,
         "description": description,
-        "file": save_path,
+        "file": os.path.basename(save_path),
     })
 
     with open(meta_path, "w", encoding="utf-8") as f:
@@ -98,8 +99,9 @@ async def delete_template(template_id: str):
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Remove file
-    if os.path.exists(target.get("file", "")):
-        os.remove(target["file"])
+    file_path = os.path.join(TEMPLATE_DIR, target.get("file", ""))
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
     templates = [t for t in templates if t["template_id"] != template_id]
     with open(meta_path, "w", encoding="utf-8") as f:
@@ -124,10 +126,11 @@ async def preview_template(template_id: str, max_rows: int = 50):
             target = t
             break
 
-    if not target or not os.path.exists(target.get("file", "")):
+    file_path = os.path.join(TEMPLATE_DIR, target.get("file", "")) if target else ""
+    if not target or not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Template not found")
 
-    wb = openpyxl.load_workbook(target["file"], data_only=True)
+    wb = openpyxl.load_workbook(file_path, data_only=True)
     ws = wb.active
 
     # 收集合并单元格信息 / Collect merged cell ranges
